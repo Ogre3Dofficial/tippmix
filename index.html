@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ogre3D | Tippmix Bankroll</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1017;--panel:#131c27;--line:#263747;--text:#e8f1f8;--muted:#91a5b8;--green:#7cff6b;--red:#ff647c;--cyan:#43d9ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#142638,#0b1017 55%);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:26px max(18px,calc((100% - 1200px)/2));border-bottom:1px solid var(--line);background:#0b1017dd}
+.brand{font-weight:900;letter-spacing:.12em;color:var(--green);font-size:1.1rem}h1{margin:8px 0 0;font-size:clamp(1.5rem,4vw,2.3rem)}.sub,.muted{color:var(--muted)}main{max-width:1200px;margin:auto;padding:22px 16px 50px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.card,.panel{background:linear-gradient(145deg,#15212e,#101822);border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:0 8px 30px #0002}.label{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.value{font-size:1.65rem;font-weight:800;margin-top:5px}.positive{color:var(--green)}.negative{color:var(--red)}.layout{display:grid;grid-template-columns:1fr 1.5fr;gap:14px;margin-top:16px}.panel h2{margin:0 0 14px;font-size:1.1rem}form{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{display:grid;gap:5px;color:var(--muted);font-size:.85rem}input,select,button{font:inherit;border-radius:9px;border:1px solid #33495b;background:#0c141d;color:var(--text);padding:10px;width:100%}.wide{grid-column:1/-1}button{background:var(--green);color:#09120b;border:0;font-weight:800;cursor:pointer}button.secondary{background:#213141;color:var(--text);border:1px solid #33495b}button.danger{background:#3a1822;color:#ff9aa9;border:1px solid #723040}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;min-width:620px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:.78rem;color:var(--muted);text-transform:uppercase}td button{padding:5px 8px;width:auto}.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.filters select{width:auto}.bar{height:9px;border-radius:8px;background:#253444;overflow:hidden}.bar span{display:block;height:100%;background:var(--green)}.note{margin-top:16px;border:1px solid #3b4a30;background:#162019;padding:12px 14px;border-radius:12px;color:#c9e9c1;font-size:.9rem}.status{font-size:.85rem;color:var(--muted)}@media(max-width:800px){.layout{grid-template-columns:1fr}header{padding:20px 16px}form{grid-template-columns:1fr 1fr}}@media(max-width:440px){form{grid-template-columns:1fr}.wide{grid-column:auto}.value{font-size:1.35rem}}
+</style>
+</head>
+<body>
+<header><div class="brand">OGRE3D OFFICIAL</div><h1>♠ TIPPMIX BANKROLL MANAGER</h1><div class="sub">Fogadásnapló · bankroll · heti / havi statisztika</div></header>
+<main>
+<div class="cards">
+ <div class="card"><div class="label">Összes profit</div><div id="totalProfit" class="value">0 Ft</div></div>
+ <div class="card"><div class="label">Nyerési arány</div><div id="winRate" class="value">0%</div></div>
+ <div class="card"><div class="label">Lezárt fogadások</div><div id="settled" class="value">0</div></div>
+ <div class="card"><div class="label">Összes feltett tét</div><div id="stakes" class="value">0 Ft</div></div>
+ <div class="card"><div class="label">ROI</div><div id="roi" class="value">0%</div></div>
+</div>
+<div class="layout">
+<section class="panel"><h2 id="formTitle">＋ Új fogadás</h2>
+<form id="betForm">
+<input type="hidden" id="editId">
+<label>Dátum<input id="date" type="date" required></label>
+<label>Tét (Ft)<input id="stake" type="number" min="0" step="1" required placeholder="1000"></label>
+<label>Odds<input id="odds" type="number" min="1" step="0.01" required placeholder="2.00"></label>
+<label>Eredmény<select id="result"><option value="Függőben">Függőben</option><option value="Nyert">Nyert</option><option value="Veszített">Veszített</option><option value="Void">Void / visszajár</option></select></label>
+<label class="wide">Meccs / esemény<input id="event" placeholder="Pl. Arsenal – Chelsea"></label>
+<label class="wide">Tipp / megjegyzés<input id="tip" placeholder="Pl. 1X, Over 2.5"></label>
+<div class="wide"><button type="submit" id="saveBtn">Fogadás mentése</button><div id="formStatus" class="status"></div></div>
+</form>
+<div class="actions"><button class="secondary" id="exportBtn" type="button">Exportálás CSV-be</button><button class="secondary" id="importBtn" type="button">CSV import</button><input id="csvFile" type="file" accept=".csv,text/csv" hidden></div>
+<div class="note">Az első verzió helyi böngészőtárolót használ. A közös, több eszközös szinkronizálás akkor működik, ha beállítod a Supabase adatbázist a README alapján.</div>
+</section>
+<section class="panel"><h2>Fogadások</h2><div class="filters"><select id="period"><option value="all">Minden fogadás</option><option value="week">Aktuális hét</option><option value="month">Aktuális hónap</option></select><select id="statusFilter"><option value="all">Minden eredmény</option><option>Függőben</option><option>Nyert</option><option>Veszített</option><option>Void</option></select><span id="count" class="status"></span></div>
+<div class="scroll"><table><thead><tr><th>Dátum</th><th>Esemény / tipp</th><th>Tét</th><th>Odds</th><th>Eredmény</th><th>Profit</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></section>
+</div>
+<div class="layout">
+<section class="panel"><h2>Heti elemzés (ISO hét)</h2><div class="scroll"><table><thead><tr><th>Hét</th><th>Fogadások</th><th>Profit</th><th>Nyerési %</th></tr></thead><tbody id="weeks"></tbody></table></div></section>
+<section class="panel"><h2>Havi elemzés</h2><div class="scroll"><table><thead><tr><th>Hónap</th><th>Fogadások</th><th>Profit</th><th>Nyerési %</th></tr></thead><tbody id="months"></tbody></table></div></section>
+</div>
+<p class="status" id="storageStatus">Tárolás: ez a böngésző eszközén</p>
+</main>
+<script>
+const KEY='ogre3d-tippmix-v1';
+let bets=JSON.parse(localStorage.getItem(KEY)||'[]');
+const $=id=>document.getElementById(id), money=n=>new Intl.NumberFormat('hu-HU',{style:'currency',currency:'HUF',maximumFractionDigits:0}).format(n||0), pct=n=>(n*100).toLocaleString('hu-HU',{maximumFractionDigits:1})+'%';
+const iso=d=>{const x=new Date(d+'T12:00:00');const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day+3);const first=new Date(x.getFullYear(),0,4);const w=1+Math.round(((x-first)/86400000-3+((first.getDay()+6)%7))/7);return `${x.getFullYear()}-CW${String(w).padStart(2,'0')}`};
+const profit=b=>b.result==='Nyert'?b.stake*(b.odds-1):b.result==='Veszített'?-b.stake:0;
+const closed=b=>['Nyert','Veszített'].includes(b.result);
+function save(){localStorage.setItem(KEY,JSON.stringify(bets));render()}
+function render(){
+ const settled=bets.filter(closed),staked=settled.reduce((s,b)=>s+b.stake,0),p=settled.reduce((s,b)=>s+profit(b),0),wins=settled.filter(b=>b.result==='Nyert').length;
+ $('totalProfit').textContent=money(p);$('totalProfit').className='value '+(p>=0?'positive':'negative');$('winRate').textContent=pct(settled.length?wins/settled.length:0);$('settled').textContent=settled.length;$('stakes').textContent=money(staked);$('roi').textContent=pct(staked?p/staked:0);
+ let list=[...bets].sort((a,b)=>b.date.localeCompare(a.date));const period=$('period').value,filter=$('statusFilter').value,now=new Date(),today=now.toISOString().slice(0,10),monday=new Date(now);monday.setDate(now.getDate()-(now.getDay()+6)%7);const mondayStr=monday.toISOString().slice(0,10);
+ list=list.filter(b=>(period==='all'||(period==='week'?b.date>=mondayStr:b.date.slice(0,7)===today.slice(0,7)))&&(filter==='all'||b.result===filter));
+ $('count').textContent=`${list.length} tétel`;
+ $('rows').innerHTML=list.map(b=>`<tr><td>${b.date}</td><td>${esc(b.event||'—')}<div class="muted">${esc(b.tip||'')}</div></td><td>${money(b.stake)}</td><td>${Number(b.odds).toFixed(2)}</td><td>${esc(b.result)}</td><td class="${profit(b)>=0?'positive':'negative'}">${closed(b)?money(profit(b)):'—'}</td><td><button class="secondary" onclick="editBet('${b.id}')">✎</button> <button class="danger" onclick="deleteBet('${b.id}')">×</button></td></tr>`).join('')||'<tr><td colspan="7" class="muted">Még nincs fogadás ebben a nézetben.</td></tr>';
+ const group=(keyfn)=>{const g={};bets.filter(closed).forEach(b=>{let k=keyfn(b);(g[k]??=[]).push(b)});return Object.entries(g).sort((a,b)=>b[0].localeCompare(a[0]))};
+ $('weeks').innerHTML=group(b=>iso(b.date)).slice(0,20).map(([k,arr])=>summaryRow(k,arr)).join('')||'<tr><td colspan="4" class="muted">Nincs lezárt fogadás.</td></tr>';
+ $('months').innerHTML=group(b=>b.date.slice(0,7)).slice(0,18).map(([k,arr])=>summaryRow(k,arr)).join('')||'<tr><td colspan="4" class="muted">Nincs lezárt fogadás.</td></tr>';
+}
+function summaryRow(k,a){const p=a.reduce((s,b)=>s+profit(b),0),w=a.filter(b=>b.result==='Nyert').length;return `<tr><td>${k}</td><td>${a.length}</td><td class="${p>=0?'positive':'negative'}">${money(p)}</td><td>${pct(w/a.length)}</td></tr>`}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+$('date').value=new Date().toISOString().slice(0,10);
+$('betForm').addEventListener('submit',e=>{e.preventDefault();const id=$('editId').value||crypto.randomUUID();const old=bets.find(b=>b.id===id);const b={id,date:$('date').value,stake:Number($('stake').value),odds:Number($('odds').value),result:$('result').value,event:$('event').value.trim(),tip:$('tip').value.trim(),createdAt:old?.createdAt||new Date().toISOString()};if(old)bets=bets.map(x=>x.id===id?b:x);else bets.push(b);save();e.target.reset();$('editId').value='';$('date').value=new Date().toISOString().slice(0,10);$('formTitle').textContent='＋ Új fogadás';$('saveBtn').textContent='Fogadás mentése';$('formStatus').textContent='Mentve ebben a böngészőben.'});
+window.editBet=id=>{const b=bets.find(x=>x.id===id);if(!b)return;$('editId').value=b.id;$('date').value=b.date;$('stake').value=b.stake;$('odds').value=b.odds;$('result').value=b.result;$('event').value=b.event||'';$('tip').value=b.tip||'';$('formTitle').textContent='Fogadás szerkesztése';$('saveBtn').textContent='Módosítás mentése';window.scrollTo({top:0,behavior:'smooth'})};
+window.deleteBet=id=>{if(confirm('Biztosan törlöd ezt a fogadást?')){bets=bets.filter(b=>b.id!==id);save()}};
+$('period').onchange=render;$('statusFilter').onchange=render;
+$('exportBtn').onclick=()=>{const data=[['id','date','stake','odds','result','event','tip'],...bets.map(b=>[b.id,b.date,b.stake,b.odds,b.result,b.event,b.tip])];const csv=data.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='tippmix-export.csv';a.click();URL.revokeObjectURL(a.href)};
+$('importBtn').onclick=()=>$('csvFile').click();
+$('csvFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;const text=await f.text();const lines=text.replace(/^\ufeff/,'').split(/\r?\n/).filter(Boolean);const parse=line=>{let out=[],v='',q=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'&&q&&line[i+1]==='"'){v+='"';i++}else if(c==='"')q=!q;else if((c===';'||c===',')&&!q){out.push(v);v=''}else v+=c}out.push(v);return out};const imported=lines.slice(1).map(line=>{const a=parse(line);return {id:a[0]||crypto.randomUUID(),date:a[1],stake:Number(a[2]),odds:Number(a[3]),result:a[4]||'Függőben',event:a[5]||'',tip:a[6]||''}}).filter(b=>b.date&&Number.isFinite(b.stake)&&Number.isFinite(b.odds));if(confirm(`${imported.length} fogadás importálása? A meglévő adatokhoz hozzáadódnak.`)){bets.push(...imported);save()}e.target.value=''};
+render();
+</script>
+</body></html>
