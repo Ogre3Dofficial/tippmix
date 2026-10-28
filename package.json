@@ -1,0 +1,9 @@
+{
+  "name": "ogre3d-tippmix-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tippmix web app with secure GitHub Excel saving",
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  }
+}

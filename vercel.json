@@ -1,0 +1,5 @@
+{
+  "functions": {
+    "api/save.js": { "maxDuration": 30 }
+  }
+}

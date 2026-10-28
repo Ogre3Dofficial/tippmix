@@ -1,28 +1,50 @@
-# Tippmix webes felület — GitHub Excel mentéssel
+# Ogre3D Tippmix webalkalmazás – biztonságos GitHub Excel-mentéssel
 
-## Mit csinál?
-- A GitHub repository `tippmix.xlsx` fájlját olvassa be.
-- A fogadások mentésekor frissíti a GitHubon lévő munkafüzetet, ha a GitHub-kapcsolat aktív.
-- A heti/havi elemzést a weboldal számolja újra.
+Ez a csomag a meglévő `tippmix.xlsx` munkafüzetet használja adatforrásként, és a mentési kéréseket a Vercel szerveroldali `/api/save` végpontján keresztül küldi a GitHubra. A GitHub-token nem kerül az `index.html` fájlba és nem látható a böngészőben.
 
-## GitHub Pages telepítés
-1. Töltsd fel az `index.html` és `tippmix.xlsx` fájlokat a `Ogre3Dofficial/tippmix` repository `main` ágának gyökérkönyvtárába.
-2. GitHub → Settings → Pages → Deploy from a branch → `main` → `/(root)`.
-3. Nyisd meg: https://ogre3dofficial.github.io/tippmix/ .
+## Fontos
 
-## GitHub mentés engedélyezése
-1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.
-2. Resource owner: `Ogre3Dofficial`.
-3. Repository access: Only select repositories → `tippmix`.
-4. Repository permissions: **Contents: Read and write**. Más jogosultságot ne adj.
-5. Hozd létre a tokent, másold ki, majd a weboldalon a „Mentés a GitHubon lévő Excelbe” panelen illeszd be, és kattints a Kapcsolódás gombra.
-6. A token csak a böngésző memóriájában marad, nem tároljuk localStorage-ban, és az oldal frissítésekor újra be kell illeszteni. Ne illeszd be nyilvános vagy megosztott gépen.
+- A GitHub Pages önmagában nem tudja futtatni az `/api/save` szerveroldali végpontot. Ezt a csomagot Vercelre kell telepíteni, és a Vercel által adott webcímet kell használni.
+- A GitHubon lévő repository nyilvános, ezért a `tippmix.xlsx` fájl tartalmát bárki megtekintheti és letöltheti.
+- A token semmiképp ne kerüljön az `index.html` fájlba. Csak Vercel Environment Variable-ként tárold.
+- A meglévő GitHub Actions secret nem osztódik meg automatikusan a Vercellel; a tokent külön fel kell venni a Vercel projektben.
 
-## Fontos biztonsági és működési megjegyzések
-- A webes felület módosításai jelszó nélkül elérhetők; a GitHub-token csak mentéshez szükséges.
-- A repository nyilvános, ezért maga az Excel nyilvánosan letölthető.
-- A tokent kizárólag erre az egy repositoryra és csak Contents: Read and write jogosultságra korlátozd.
-A GitHub-token ettől függetlenül szükséges a GitHubra íráshoz.
-- A mentés a `Tippmix napló` munkalap C:I oszlopait frissíti, a meccsnevet és tippet J:K oszlopba írja. A többi munkalapot a könyvtár megőrzi. Első használat előtt tarts biztonsági másolatot az Excelről.
-- A GitHubon a változás commitként jelenik meg. Egyszerre csak egy eszközön szerkessz, mert a párhuzamos mentések felülírhatják egymást.
-- Az ExcelJS/XLSX könyvtárak CDN-ről töltődnek, ezért internetkapcsolat kell.
+## 1. Töltsd fel a fájlokat a GitHubra
+
+A `Ogre3Dofficial/tippmix` repository `main` ágának gyökerébe töltsd fel / cseréld le az alábbiakat:
+
+- `index.html`
+- `tippmix.xlsx`
+- `package.json`
+- `vercel.json`
+- `api/save.js` (az `api` mappával együtt)
+
+## 2. Telepítsd Vercelre
+
+1. Nyisd meg https://vercel.com/new és lépj be GitHub-fiókkal.
+2. Importáld a `Ogre3Dofficial/tippmix` repositoryt.
+3. Framework preset: `Other` (ha kéri).
+4. Root Directory: `./`.
+5. Deploy előtt vagy utána nyisd meg a projekt `Settings → Environment Variables` részét, és add hozzá:
+
+   - `GITHUB_TOKEN` = a fine-grained GitHub token értéke
+   - `SAVE_PASSWORD` = egy saját, erős mentési jelszó (ne a GitHub-token legyen)
+
+   Mindkettőt `Production` környezethez add hozzá (és Preview-hoz is, ha ott is tesztelnél). A token csak a `tippmix` repositoryhoz és `Contents: Read and write` jogosultságra legyen korlátozva.
+
+6. Mentsd a változókat, majd indíts új deploymentet / redeployt, hogy érvénybe lépjenek.
+
+## 3. Használat
+
+- Nyisd meg a Vercel által adott webcímet (ne a GitHub Pages címet), például `https://<projektneved>.vercel.app`.
+- Az oldal a GitHub nyilvános `tippmix.xlsx` fájljából tölti be a fogadásokat.
+- A „Mentési jelszó” mezőbe írd be a Vercelben beállított `SAVE_PASSWORD` értéket.
+- A „Fogadás mentése” gomb a `/api/save` végponton keresztül frissíti a GitHub `main` ágán lévő `tippmix.xlsx` fájlt.
+
+## Működés és korlátok
+
+- A szerveroldali mentés a `Tippmix napló` munkalap C:I és J:K oszlopait írja újra a webes fogadáslistából, és a többi munkalapot megőrzi. Első használat előtt legyen biztonsági másolatod.
+- Az Excel mentése GitHub commitot hoz létre. Ne szerkessz egyszerre több eszközön, mert az egymásra mentések ütközhetnek.
+- A jelszó minden mentési kérésben elküldésre kerül HTTPS-en a saját Vercel végpontodra; a szerver összehasonlítja a `SAVE_PASSWORD` környezeti változóval. Ne használj olyan jelszót, amit máshol is használsz.
+- A webes oldalon látható jelszómező nem helyettesít teljes felhasználói fiókrendszert. Ha a repository és az alkalmazás nyilvános, a mentési végpont URL-je is ismert lesz; a jelszó védi a mentési műveletet.
+- A dátumokat ISO `YYYY-MM-DD` formában kezeljük, hogy ne csússzanak el időzóna miatt.

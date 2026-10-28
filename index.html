@@ -15,15 +15,13 @@ header{padding:26px max(18px,calc((100% - 1200px)/2));border-bottom:1px solid va
 <body>
 <header><div class="brand">OGRE3D OFFICIAL</div><h1>♠ TIPPMIX BANKROLL MANAGER</h1><div class="sub">Fogadásnapló · bankroll · heti / havi statisztika</div></header>
 <main>
-<section class="panel" style="margin-bottom:16px" aria-label="GitHub Excel mentés">
- <h2>☁️ Mentés a GitHubon lévő Excelbe</h2>
- <p class="status">A token csak ebben a böngésző-munkamenetben marad memóriában, nem mentjük el a fájlba vagy a böngésző tárhelyére. Csak a <b>Ogre3Dofficial/tippmix</b> repositoryhoz adj hozzáférést.</p>
+<section class="panel" style="margin-bottom:16px" aria-label="Biztonságos mentés">
+ <h2>☁️ Automatikus mentés a GitHub Excelbe</h2>
+ <p class="status">A mentési jelszót a háttérszolgáltatás ellenőrzi. A GitHub-token nem kerül a böngészőbe.</p>
  <div class="filters">
-  <label style="min-width:240px;flex:1">GitHub Fine-grained Personal Access Token<input id="githubToken" type="password" autocomplete="off" placeholder="github_pat_…"></label>
-  <button id="connectGithubBtn" type="button" style="align-self:end">Kapcsolódás</button>
-  <button id="disconnectGithubBtn" type="button" class="secondary" style="align-self:end;display:none">Leválasztás</button>
+  <label style="min-width:240px;flex:1">Mentési jelszó<input id="savePassword" type="password" autocomplete="current-password" placeholder="Add meg a mentési jelszót"></label>
+  <span id="githubStatus" class="status" role="status">Mentésre kész. A fogadás mentése gomb frissíti az online Excelt.</span>
  </div>
- <div id="githubStatus" class="status" role="status">Nincs csatlakoztatva. Mentéskor egyelőre csak ebben a böngészőben tárolódnak az adatok.</div>
 </section>
 <div class="cards">
  <div class="card"><div class="label">Összes profit</div><div id="totalProfit" class="value">0 Ft</div></div>
@@ -54,63 +52,34 @@ header{padding:26px max(18px,calc((100% - 1200px)/2));border-bottom:1px solid va
 <section class="panel"><h2>Heti elemzés (ISO hét)</h2><div class="scroll"><table><thead><tr><th>Hét</th><th>Fogadások</th><th>Megtett tét</th><th>Profit</th><th>Nyerési %</th><th>ROI</th></tr></thead><tbody id="weeks"></tbody></table></div></section>
 <section class="panel"><h2>Havi elemzés</h2><div class="scroll"><table><thead><tr><th>Hónap</th><th>Fogadások</th><th>Megtett tét</th><th>Profit</th><th>Nyerési %</th><th>ROI</th></tr></thead><tbody id="months"></tbody></table></div></section>
 </div>
-<p class="status" id="storageStatus">Excel-forrás: GitHubon lévő tippmix.xlsx · mentés: helyi böngésző vagy GitHub</p>
+<p class="status" id="storageStatus">Excel-forrás: GitHubon lévő tippmix.xlsx · mentés: biztonságos háttérszolgáltatáson keresztül</p>
 </main>
 <script>
 const KEY='ogre3d-tippmix-v3';
 const OLD_KEY='ogre3d-tippmix-v2';
 let bets=[];
 let excelLoaded=false;
+let editingUnlocked=true;
 const GITHUB_OWNER='Ogre3Dofficial', GITHUB_REPO='tippmix', GITHUB_BRANCH='main', GITHUB_FILE='tippmix.xlsx';
-let githubToken='';
+function applyEditLock(){}
 const $=id=>document.getElementById(id), money=n=>new Intl.NumberFormat('hu-HU',{style:'currency',currency:'HUF',maximumFractionDigits:0}).format(n||0), pct=n=>(n*100).toLocaleString('hu-HU',{maximumFractionDigits:1})+'%';
 const iso=d=>{const x=new Date(d+'T12:00:00');const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day+3);const first=new Date(x.getFullYear(),0,4);const w=1+Math.round(((x-first)/86400000-3+((first.getDay()+6)%7))/7);return `${x.getFullYear()}-CW${String(w).padStart(2,'0')}`};
 const profit=b=>b.result==='Nyert'?b.stake*(b.odds-1):b.result==='Veszített'?-b.stake:0;
 const closed=b=>['Nyert','Veszített'].includes(b.result);
 async function save(){
  localStorage.setItem(KEY,JSON.stringify(bets));render();
- if(githubToken){
-   $('formStatus').textContent='Mentés a GitHub Excelbe folyamatban…';
-   try{await saveWorkbookToGitHub();$('formStatus').textContent='Sikeresen mentve a GitHubon lévő Excelbe.';$('githubStatus').textContent='✓ Kapcsolódva · az Excel sikeresen frissült a GitHubon.';$('storageStatus').textContent='Adatforrás és mentés: GitHub tippmix.xlsx · sikeres szinkron';}
-   catch(err){$('formStatus').textContent='Helyben mentve, GitHub-mentés sikertelen: '+err.message;$('githubStatus').textContent='GitHub-mentési hiba: '+err.message;}
- } else {
-   $('formStatus').textContent='Helyben mentve ebben a böngészőben. GitHub-mentéshez csatlakoztass tokent.';
- }
-} 
-function arrayBufferToBase64(buffer){const bytes=new Uint8Array(buffer);let binary='';const chunk=0x8000;for(let i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+chunk,bytes.length)));return btoa(binary)}
-function base64ToArrayBuffer(text){const binary=atob(text.replace(/\s/g,''));const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes.buffer}
-async function githubRequest(path,options={}){
- const res=await fetch('https://api.github.com'+path,{...options,headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+githubToken,'X-GitHub-Api-Version':'2022-11-28',...(options.headers||{})}});
- const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.message||('GitHub API hiba ('+res.status+')'));return data;
-}
-async function saveWorkbookToGitHub(){
- if(!githubToken)throw new Error('Nincs GitHub-kapcsolat.');
- if(!window.ExcelJS)throw new Error('Az ExcelJS könyvtár nem töltődött be. Ellenőrizd az internetkapcsolatot.');
- const apiPath=`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}?ref=${GITHUB_BRANCH}`;
- const remote=await githubRequest(apiPath);
- const raw=base64ToArrayBuffer(remote.content||'');
- const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(raw);
- const ws=workbook.getWorksheet('Tippmix napló');if(!ws)throw new Error('A munkafüzetből hiányzik a Tippmix napló munkalap.');
- ws.getCell('J6').value=ws.getCell('J6').value||'Meccs / esemény';ws.getCell('K6').value=ws.getCell('K6').value||'Tipp / megjegyzés';
- const sorted=[...bets].sort((a,b)=>a.date.localeCompare(b.date));
- const endRow=Math.max(ws.rowCount,133,sorted.length+6);
- for(let r=7;r<=endRow;r++)for(let c=3;c<=11;c++)ws.getRow(r).getCell(c).value=null;
- for(let i=0;i<sorted.length;i++){
-   const b=sorted[i],r=i+7,row=ws.getRow(r);
-   if(r>133){const template=ws.getRow(7);template.eachCell({includeEmpty:true},(cell,col)=>{row.getCell(col).style=JSON.parse(JSON.stringify(cell.style||{}));row.getCell(col).numFmt=cell.numFmt;});}
-   row.getCell(3).value=new Date(b.date+'T12:00:00.000Z');row.getCell(3).numFmt='yyyy.mm.dd';
-   row.getCell(4).value=Number(b.stake)||0;row.getCell(5).value=Number(b.odds)||0;
-   row.getCell(6).value={formula:`IF(OR(E${r}="",D${r}=""),"",E${r}*D${r})`};
-   row.getCell(7).value=b.result||'Függőben';row.getCell(8).value={formula:`IF(G${r}="Nyert",F${r},0)`};
-   row.getCell(9).value={formula:`IF(G${r}="Nyert",H${r}-D${r},IF(G${r}="Veszített",-D${r},0))`};
-   row.getCell(10).value=b.event||'';row.getCell(11).value=b.tip||'';
-   b.sourceRow=r;
- }
- workbook.calcProperties={...(workbook.calcProperties||{}),fullCalcOnLoad:true,forceFullCalc:true,calcMode:'auto'};
- const out=await workbook.xlsx.writeBuffer();
- const updated=await githubRequest(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Update Tippmix data from web app',content:arrayBufferToBase64(out),sha:remote.sha,branch:GITHUB_BRANCH})});
- localStorage.setItem(KEY,JSON.stringify(bets));localStorage.setItem('ogre3d-tippmix-github-synced','1');
- return updated;
+ const password=$('savePassword').value;
+ if(!password){$('formStatus').textContent='Add meg a mentési jelszót a felső mezőben.';return}
+ $('formStatus').textContent='Mentés a GitHub Excelbe folyamatban…';
+ try{
+   const res=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password,bets})});
+   const data=await res.json().catch(()=>({}));
+   if(!res.ok)throw new Error(data.error||('Mentési hiba ('+res.status+')'));
+   $('formStatus').textContent='Sikeresen mentve a GitHubon lévő Excelbe.';
+   $('githubStatus').textContent='✓ Az online Excel sikeresen frissült.';
+   $('storageStatus').textContent='Adatforrás és mentés: GitHub tippmix.xlsx · sikeres szinkron';
+   localStorage.setItem('ogre3d-tippmix-github-synced','1');
+ }catch(err){$('formStatus').textContent='A böngészőben mentve, de az online Excel frissítése sikertelen: '+err.message;$('githubStatus').textContent='Mentési hiba: '+err.message;}
 }
 function render(){
  const settled=bets.filter(closed),staked=settled.reduce((s,b)=>s+b.stake,0),p=settled.reduce((s,b)=>s+profit(b),0),wins=settled.filter(b=>b.result==='Nyert').length;
@@ -122,23 +91,24 @@ function render(){
  const group=(keyfn)=>{const g={};bets.filter(closed).forEach(b=>{let k=keyfn(b);(g[k]??=[]).push(b)});return Object.entries(g).sort((a,b)=>b[0].localeCompare(a[0]))};
  $('weeks').innerHTML=groupAll(b=>iso(b.date)).slice(0,20).map(([k,arr])=>summaryRow(k,arr)).join('')||'<tr><td colspan="6" class="muted">Nincs fogadás.</td></tr>';
  $('months').innerHTML=groupAll(b=>b.date.slice(0,7)).slice(0,18).map(([k,arr])=>summaryRow(k,arr)).join('')||'<tr><td colspan="6" class="muted">Nincs fogadás.</td></tr>';
+ applyEditLock();
 }
 function groupAll(keyfn){const g={};bets.forEach(b=>{let k=keyfn(b);(g[k]??=[]).push(b)});return Object.entries(g).sort((a,b)=>b[0].localeCompare(a[0]))}
 function summaryRow(k,a){const settled=a.filter(closed),p=settled.reduce((s,b)=>s+profit(b),0),staked=a.reduce((s,b)=>s+(Number(b.stake)||0),0),settledStake=settled.reduce((s,b)=>s+(Number(b.stake)||0),0),w=settled.filter(b=>b.result==='Nyert').length;return `<tr><td>${k}</td><td>${a.length}</td><td>${money(staked)}</td><td class="${p>=0?'positive':'negative'}">${money(p)}</td><td>${pct(settled.length?w/settled.length:0)}</td><td>${pct(settledStake?p/settledStake:0)}</td></tr>`}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-$('date').value=new Date().toISOString().slice(0,10);
-$('betForm').addEventListener('submit',e=>{e.preventDefault();const id=$('editId').value||crypto.randomUUID();const old=bets.find(b=>b.id===id);const b={id,date:$('date').value,stake:Number($('stake').value),odds:Number($('odds').value),result:$('result').value,event:$('event').value.trim(),tip:$('tip').value.trim(),createdAt:old?.createdAt||new Date().toISOString()};if(old)bets=bets.map(x=>x.id===id?b:x);else bets.push(b);save();e.target.reset();$('editId').value='';$('date').value=new Date().toISOString().slice(0,10);$('formTitle').textContent='＋ Új fogadás';$('saveBtn').textContent='Fogadás mentése';$('formStatus').textContent='Mentve ebben a böngészőben.'});
+$('date').value=(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`})();
+$('betForm').addEventListener('submit',e=>{e.preventDefault();const id=$('editId').value||crypto.randomUUID();const old=bets.find(b=>b.id===id);const b={id,date:$('date').value,stake:Number($('stake').value),odds:Number($('odds').value),result:$('result').value,event:$('event').value.trim(),tip:$('tip').value.trim(),createdAt:old?.createdAt||new Date().toISOString()};if(old)bets=bets.map(x=>x.id===id?b:x);else bets.push(b);save();e.target.reset();$('editId').value='';$('date').value=(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`})();$('formTitle').textContent='＋ Új fogadás';$('saveBtn').textContent='Fogadás mentése';$('formStatus').textContent='Mentve ebben a böngészőben.'});
 window.editBet=id=>{const b=bets.find(x=>x.id===id);if(!b)return;$('editId').value=b.id;$('date').value=b.date;$('stake').value=b.stake;$('odds').value=b.odds;$('result').value=b.result;$('event').value=b.event||'';$('tip').value=b.tip||'';$('formTitle').textContent='Fogadás szerkesztése';$('saveBtn').textContent='Módosítás mentése';window.scrollTo({top:0,behavior:'smooth'})};
 window.deleteBet=id=>{if(confirm('Biztosan törlöd ezt a fogadást?')){bets=bets.filter(b=>b.id!==id);save()}};
 $('period').onchange=render;$('statusFilter').onchange=render;
 $('exportBtn').onclick=()=>{const data=[['id','date','stake','odds','result','event','tip'],...bets.map(b=>[b.id,b.date,b.stake,b.odds,b.result,b.event,b.tip])];const csv=data.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='tippmix-export.csv';a.click();URL.revokeObjectURL(a.href)};
-$('importBtn').onclick=()=>$('csvFile').click();
+$('importBtn').onclick=()=>{$('csvFile').click()};
 $('csvFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;const text=await f.text();const lines=text.replace(/^\ufeff/,'').split(/\r?\n/).filter(Boolean);const parse=line=>{let out=[],v='',q=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'&&q&&line[i+1]==='"'){v+='"';i++}else if(c==='"')q=!q;else if((c===';'||c===',')&&!q){out.push(v);v=''}else v+=c}out.push(v);return out};const imported=lines.slice(1).map(line=>{const a=parse(line);return {id:a[0]||crypto.randomUUID(),date:a[1],stake:Number(a[2]),odds:Number(a[3]),result:a[4]||'Függőben',event:a[5]||'',tip:a[6]||''}}).filter(b=>b.date&&Number.isFinite(b.stake)&&Number.isFinite(b.odds));if(confirm(`${imported.length} fogadás importálása? A meglévő adatokhoz hozzáadódnak.`)){bets.push(...imported);save()}e.target.value=''};
 async function loadWorkbookSeed(){
   const notice=$('excelNotice');
   try{
     if(!window.XLSX) throw new Error('Az Excel-beolvasó könyvtár nem töltődött be. Ellenőrizd az internetkapcsolatot.');
-    const res=await fetch('./tippmix.xlsx',{cache:'no-store'});
+    const res=await fetch('https://raw.githubusercontent.com/Ogre3Dofficial/tippmix/main/tippmix.xlsx?cache='+Date.now(),{cache:'no-store'});
     if(!res.ok) throw new Error('Nem találom a repositoryban a tippmix.xlsx fájlt. Töltsd fel az index.html mellé.');
     const buf=await res.arrayBuffer();
     const wb=XLSX.read(buf,{type:'array',cellDates:false});
@@ -173,20 +143,14 @@ async function loadWorkbookSeed(){
     }
     localStorage.setItem(KEY,JSON.stringify(bets));
     excelLoaded=true;
-    $('storageStatus').textContent='Adatforrás: GitHub tippmix.xlsx · mentéshez csatlakoztasd a GitHub tokent';
+    $('storageStatus').textContent='Adatforrás: GitHub tippmix.xlsx · a mentéshez add meg a mentési jelszót';
     render();
   }catch(err){
     notice.textContent='Excel betöltési hiba: '+err.message+' A fájl neve legyen pontosan tippmix.xlsx, és az index.html mellett legyen a repository gyökerében.';
     $('storageStatus').textContent='Excel-forrás nem érhető el';render();
   }
 }
-$('connectGithubBtn').addEventListener('click',async()=>{
- const candidate=$('githubToken').value.trim();if(!candidate){$('githubStatus').textContent='Illeszd be a GitHub tokent.';return}
- githubToken=candidate;$('githubStatus').textContent='Kapcsolódás ellenőrzése…';
- try{await githubRequest(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}?ref=${GITHUB_BRANCH}`);$('githubToken').value='';$('connectGithubBtn').style.display='none';$('disconnectGithubBtn').style.display='inline-block';$('githubStatus').textContent='✓ Kapcsolódva a GitHub Excelhez. A következő mentések frissítik a tippmix.xlsx fájlt.';$('storageStatus').textContent='Adatforrás: GitHub tippmix.xlsx · automatikus mentés aktív';}
- catch(err){githubToken='';$('githubStatus').textContent='Nem sikerült csatlakozni: '+err.message+'. Ellenőrizd a tokent és a repository Contents: Read and write jogosultságát.';}
-});
-$('disconnectGithubBtn').addEventListener('click',()=>{githubToken='';$('disconnectGithubBtn').style.display='none';$('connectGithubBtn').style.display='inline-block';$('githubStatus').textContent='Leválasztva. A mentések csak helyben történnek.'});
+applyEditLock();
 loadWorkbookSeed();
 </script>
 </body></html>
