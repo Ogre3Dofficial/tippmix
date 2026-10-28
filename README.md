@@ -1,0 +1,2 @@
+# tippmix
+Tippmix fogadáskövető Excel
