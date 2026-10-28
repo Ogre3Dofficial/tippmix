@@ -4,7 +4,6 @@
 - A GitHub repository `tippmix.xlsx` fájlját olvassa be.
 - A fogadások mentésekor frissíti a GitHubon lévő munkafüzetet, ha a GitHub-kapcsolat aktív.
 - A heti/havi elemzést a weboldal számolja újra.
-- A módosítási jelszó: `01234`.
 
 ## GitHub Pages telepítés
 1. Töltsd fel az `index.html` és `tippmix.xlsx` fájlokat a `Ogre3Dofficial/tippmix` repository `main` ágának gyökérkönyvtárába.
@@ -20,9 +19,10 @@
 6. A token csak a böngésző memóriájában marad, nem tároljuk localStorage-ban, és az oldal frissítésekor újra be kell illeszteni. Ne illeszd be nyilvános vagy megosztott gépen.
 
 ## Fontos biztonsági és működési megjegyzések
+- A webes felület módosításai jelszó nélkül elérhetők; a GitHub-token csak mentéshez szükséges.
 - A repository nyilvános, ezért maga az Excel nyilvánosan letölthető.
 - A tokent kizárólag erre az egy repositoryra és csak Contents: Read and write jogosultságra korlátozd.
-- A `01234` jelszó csak a webes felület zárolását szolgálja, nem valódi hitelesítés; a publikus HTML forrásából kiolvasható. A GitHub-token ettől függetlenül szükséges a GitHubra íráshoz.
+A GitHub-token ettől függetlenül szükséges a GitHubra íráshoz.
 - A mentés a `Tippmix napló` munkalap C:I oszlopait frissíti, a meccsnevet és tippet J:K oszlopba írja. A többi munkalapot a könyvtár megőrzi. Első használat előtt tarts biztonsági másolatot az Excelről.
 - A GitHubon a változás commitként jelenik meg. Egyszerre csak egy eszközön szerkessz, mert a párhuzamos mentések felülírhatják egymást.
 - Az ExcelJS/XLSX könyvtárak CDN-ről töltődnek, ezért internetkapcsolat kell.
