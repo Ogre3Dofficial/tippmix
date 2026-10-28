@@ -2,6 +2,7 @@
 <html lang="hu">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <title>Ogre3D | Tippmix Bankroll</title>
 <style>
 :root{color-scheme:dark;--bg:#0b1017;--panel:#131c27;--line:#263747;--text:#e8f1f8;--muted:#91a5b8;--green:#7cff6b;--red:#ff647c;--cyan:#43d9ff}
@@ -33,7 +34,7 @@ header{padding:26px max(18px,calc((100% - 1200px)/2));border-bottom:1px solid va
 <div class="wide"><button type="submit" id="saveBtn">Fogadás mentése</button><div id="formStatus" class="status"></div></div>
 </form>
 <div class="actions"><button class="secondary" id="exportBtn" type="button">Exportálás CSV-be</button><button class="secondary" id="importBtn" type="button">CSV import</button><input id="csvFile" type="file" accept=".csv,text/csv" hidden></div>
-<div class="note">Az első verzió helyi böngészőtárolót használ. A közös, több eszközös szinkronizálás akkor működik, ha beállítod a Supabase adatbázist a README alapján.</div>
+<div class="note" id="excelNotice">Excel-forrás betöltése folyamatban…</div>
 </section>
 <section class="panel"><h2>Fogadások</h2><div class="filters"><select id="period"><option value="all">Minden fogadás</option><option value="week">Aktuális hét</option><option value="month">Aktuális hónap</option></select><select id="statusFilter"><option value="all">Minden eredmény</option><option>Függőben</option><option>Nyert</option><option>Veszített</option><option>Void</option></select><span id="count" class="status"></span></div>
 <div class="scroll"><table><thead><tr><th>Dátum</th><th>Esemény / tipp</th><th>Tét</th><th>Odds</th><th>Eredmény</th><th>Profit</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></section>
@@ -42,11 +43,12 @@ header{padding:26px max(18px,calc((100% - 1200px)/2));border-bottom:1px solid va
 <section class="panel"><h2>Heti elemzés (ISO hét)</h2><div class="scroll"><table><thead><tr><th>Hét</th><th>Fogadások</th><th>Profit</th><th>Nyerési %</th></tr></thead><tbody id="weeks"></tbody></table></div></section>
 <section class="panel"><h2>Havi elemzés</h2><div class="scroll"><table><thead><tr><th>Hónap</th><th>Fogadások</th><th>Profit</th><th>Nyerési %</th></tr></thead><tbody id="months"></tbody></table></div></section>
 </div>
-<p class="status" id="storageStatus">Tárolás: ez a böngésző eszközén</p>
+<p class="status" id="storageStatus">Excel-forrás: GitHub Pages melletti tippmix.xlsx · módosítások: helyi böngésző</p>
 </main>
 <script>
-const KEY='ogre3d-tippmix-v1';
-let bets=JSON.parse(localStorage.getItem(KEY)||'[]');
+const KEY='ogre3d-tippmix-v2';
+let bets=[];
+let excelLoaded=false;
 const $=id=>document.getElementById(id), money=n=>new Intl.NumberFormat('hu-HU',{style:'currency',currency:'HUF',maximumFractionDigits:0}).format(n||0), pct=n=>(n*100).toLocaleString('hu-HU',{maximumFractionDigits:1})+'%';
 const iso=d=>{const x=new Date(d+'T12:00:00');const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day+3);const first=new Date(x.getFullYear(),0,4);const w=1+Math.round(((x-first)/86400000-3+((first.getDay()+6)%7))/7);return `${x.getFullYear()}-CW${String(w).padStart(2,'0')}`};
 const profit=b=>b.result==='Nyert'?b.stake*(b.odds-1):b.result==='Veszített'?-b.stake:0;
@@ -73,6 +75,47 @@ $('period').onchange=render;$('statusFilter').onchange=render;
 $('exportBtn').onclick=()=>{const data=[['id','date','stake','odds','result','event','tip'],...bets.map(b=>[b.id,b.date,b.stake,b.odds,b.result,b.event,b.tip])];const csv=data.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='tippmix-export.csv';a.click();URL.revokeObjectURL(a.href)};
 $('importBtn').onclick=()=>$('csvFile').click();
 $('csvFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;const text=await f.text();const lines=text.replace(/^\ufeff/,'').split(/\r?\n/).filter(Boolean);const parse=line=>{let out=[],v='',q=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'&&q&&line[i+1]==='"'){v+='"';i++}else if(c==='"')q=!q;else if((c===';'||c===',')&&!q){out.push(v);v=''}else v+=c}out.push(v);return out};const imported=lines.slice(1).map(line=>{const a=parse(line);return {id:a[0]||crypto.randomUUID(),date:a[1],stake:Number(a[2]),odds:Number(a[3]),result:a[4]||'Függőben',event:a[5]||'',tip:a[6]||''}}).filter(b=>b.date&&Number.isFinite(b.stake)&&Number.isFinite(b.odds));if(confirm(`${imported.length} fogadás importálása? A meglévő adatokhoz hozzáadódnak.`)){bets.push(...imported);save()}e.target.value=''};
-render();
+async function loadWorkbookSeed(){
+  const notice=$('excelNotice');
+  try{
+    if(!window.XLSX) throw new Error('Az Excel-beolvasó könyvtár nem töltődött be. Ellenőrizd az internetkapcsolatot.');
+    const res=await fetch('./tippmix.xlsx',{cache:'no-store'});
+    if(!res.ok) throw new Error('Nem találom a repositoryban a tippmix.xlsx fájlt. Töltsd fel az index.html mellé.');
+    const buf=await res.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array',cellDates:true});
+    const ws=wb.Sheets['Tippmix napló'];
+    if(!ws) throw new Error('Az Excelben nem található a „Tippmix napló” munkalap.');
+    const saved=localStorage.getItem(KEY);
+    if(saved){
+      bets=JSON.parse(saved);
+      notice.textContent=`Excel betöltve (${bets.length} helyi fogadás). Az Excel a kezdőadatforrás; ezen az eszközön korábban mentett módosítások vannak használatban.`;
+    } else {
+      const imported=[];
+      const lastRow=ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).e.r+1 : 133;
+      for(let r=7;r<=lastRow;r++){
+        const dateCell=ws['C'+r], stakeCell=ws['D'+r], oddsCell=ws['E'+r], resultCell=ws['G'+r];
+        const dateVal=dateCell?.v;
+        const stake=Number(stakeCell?.v), odds=Number(oddsCell?.v), result=String(resultCell?.v??'').trim();
+        if(!dateVal || !Number.isFinite(stake) || !Number.isFinite(odds) || odds<=0) continue;
+        let date;
+        if(dateVal instanceof Date) date=dateVal.toISOString().slice(0,10);
+        else if(typeof dateVal==='number') date=XLSX.SSF.format('yyyy-mm-dd',dateVal);
+        else date=String(dateVal).slice(0,10);
+        imported.push({id:'excel-'+r,date,stake,odds,result:['Nyert','Veszített','Függőben','Void'].includes(result)?result:'Függőben',event:'',tip:'',createdAt:new Date().toISOString(),sourceRow:r});
+      }
+      bets=imported;
+      localStorage.setItem(KEY,JSON.stringify(bets));
+      notice.textContent=`Sikeresen betöltve az eredeti Excelből: ${bets.length} fogadási sor. A meccsnevek nem szerepelnek az Excel naplójában, ezért az esemény mezők üresek.`;
+    }
+    excelLoaded=true;
+    $('storageStatus').textContent='Excel-forrás: tippmix.xlsx a GitHub repositoryból · mentés: jelenleg ezen a böngészőn';
+    render();
+  }catch(err){
+    notice.textContent='Excel betöltési hiba: '+err.message+' A fájl neve legyen pontosan tippmix.xlsx, és az index.html mellett legyen a repository gyökerében.';
+    $('storageStatus').textContent='Excel-forrás nem érhető el';
+    render();
+  }
+}
+loadWorkbookSeed();
 </script>
 </body></html>
