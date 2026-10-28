@@ -1,11 +1,28 @@
-# Tippmix webes felület – dátum és heti/havi elemzés javítás
+# Tippmix webes felület — GitHub Excel mentéssel
 
-## Javítások
-- Az Excel dátumait Excel-sorszám alapján olvassa be, helyi időzóna-eltolás nélkül.
-- A korábbi `ogre3d-tippmix-v2` helyi tárolóban levő Excel-importált soroknál egyszeri dátumkorrekciót végez a v3 tárolóba másoláskor.
-- Heti és havi elemzésben megjelenik a megtett tét és a ROI is. A ROI = profit / lezárt fogadások téte; a megtett tét a csoport összes fogadásának téte.
+## Mit csinál?
+- A GitHub repository `tippmix.xlsx` fájlját olvassa be.
+- A fogadások mentésekor frissíti a GitHubon lévő munkafüzetet, ha a GitHub-kapcsolat aktív.
+- A heti/havi elemzést a weboldal számolja újra.
+- A módosítási jelszó: `01234`.
 
-## Telepítés
-A GitHub repository gyökérkönyvtárában cseréld le az `index.html` fájlt erre a verzióra. A `tippmix.xlsx` maradjon ugyanott. Commit changes, majd a weboldalon `Ctrl+F5`.
+## GitHub Pages telepítés
+1. Töltsd fel az `index.html` és `tippmix.xlsx` fájlokat a `Ogre3Dofficial/tippmix` repository `main` ágának gyökérkönyvtárába.
+2. GitHub → Settings → Pages → Deploy from a branch → `main` → `/(root)`.
+3. Nyisd meg: https://ogre3dofficial.github.io/tippmix/ .
 
-Megjegyzés: a böngészőben már elmentett sorokat az oldal új v3 tárolóba migrálja. Mielőtt törölnéd a régi tárolót, exportáld az adatokat CSV-be biztonsági mentésként.
+## GitHub mentés engedélyezése
+1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.
+2. Resource owner: `Ogre3Dofficial`.
+3. Repository access: Only select repositories → `tippmix`.
+4. Repository permissions: **Contents: Read and write**. Más jogosultságot ne adj.
+5. Hozd létre a tokent, másold ki, majd a weboldalon a „Mentés a GitHubon lévő Excelbe” panelen illeszd be, és kattints a Kapcsolódás gombra.
+6. A token csak a böngésző memóriájában marad, nem tároljuk localStorage-ban, és az oldal frissítésekor újra be kell illeszteni. Ne illeszd be nyilvános vagy megosztott gépen.
+
+## Fontos biztonsági és működési megjegyzések
+- A repository nyilvános, ezért maga az Excel nyilvánosan letölthető.
+- A tokent kizárólag erre az egy repositoryra és csak Contents: Read and write jogosultságra korlátozd.
+- A `01234` jelszó csak a webes felület zárolását szolgálja, nem valódi hitelesítés; a publikus HTML forrásából kiolvasható. A GitHub-token ettől függetlenül szükséges a GitHubra íráshoz.
+- A mentés a `Tippmix napló` munkalap C:I oszlopait frissíti, a meccsnevet és tippet J:K oszlopba írja. A többi munkalapot a könyvtár megőrzi. Első használat előtt tarts biztonsági másolatot az Excelről.
+- A GitHubon a változás commitként jelenik meg. Egyszerre csak egy eszközön szerkessz, mert a párhuzamos mentések felülírhatják egymást.
+- Az ExcelJS/XLSX könyvtárak CDN-ről töltődnek, ezért internetkapcsolat kell.
