@@ -98,7 +98,7 @@ async function loadWorkbookSeed(){
         const stake=Number(stakeCell?.v), odds=Number(oddsCell?.v), result=String(resultCell?.v??'').trim();
         if(!dateVal || !Number.isFinite(stake) || !Number.isFinite(odds) || odds<=0) continue;
         let date;
-        if(dateVal instanceof Date) date=dateVal.toISOString().slice(0,10);
+        if(dateVal instanceof Date) date=`${dateVal.getFullYear()}-${String(dateVal.getMonth()+1).padStart(2,'0')}-${String(dateVal.getDate()).padStart(2,'0')}`;
         else if(typeof dateVal==='number') date=XLSX.SSF.format('yyyy-mm-dd',dateVal);
         else date=String(dateVal).slice(0,10);
         imported.push({id:'excel-'+r,date,stake,odds,result:['Nyert','Veszített','Függőben','Void'].includes(result)?result:'Függőben',event:'',tip:'',createdAt:new Date().toISOString(),sourceRow:r});
