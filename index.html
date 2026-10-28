@@ -14,6 +14,15 @@ header{padding:26px max(18px,calc((100% - 1200px)/2));border-bottom:1px solid va
 <body>
 <header><div class="brand">OGRE3D OFFICIAL</div><h1>♠ TIPPMIX BANKROLL MANAGER</h1><div class="sub">Fogadásnapló · bankroll · heti / havi statisztika</div></header>
 <main>
+<section class="panel" style="margin-bottom:16px" aria-label="Módosítási hozzáférés">
+ <h2>🔐 Módosítási hozzáférés</h2>
+ <div class="filters">
+  <label style="min-width:220px;flex:1">Jelszó a módosításhoz<input id="editPassword" type="password" inputmode="numeric" autocomplete="off" placeholder="Add meg a jelszót"></label>
+  <button id="unlockBtn" type="button" style="align-self:end">Módosítás engedélyezése</button>
+  <button id="lockBtn" type="button" class="secondary" style="align-self:end;display:none">Lezárás</button>
+ </div>
+ <div id="lockStatus" class="status" role="status">🔒 A módosítások zárolva vannak. Megtekinteni lehet, szerkeszteni csak a jelszóval.</div>
+</section>
 <div class="cards">
  <div class="card"><div class="label">Összes profit</div><div id="totalProfit" class="value">0 Ft</div></div>
  <div class="card"><div class="label">Nyerési arány</div><div id="winRate" class="value">0%</div></div>
@@ -49,11 +58,21 @@ header{padding:26px max(18px,calc((100% - 1200px)/2));border-bottom:1px solid va
 const KEY='ogre3d-tippmix-v2';
 let bets=[];
 let excelLoaded=false;
+let editingUnlocked=false;
+const EDIT_PASSWORD='01234';
+function applyEditLock(){
+  document.querySelectorAll('#betForm input, #betForm select, #betForm button, #importBtn, #csvFile, #rows button').forEach(el=>{el.disabled=!editingUnlocked;});
+  $('unlockBtn').style.display=editingUnlocked?'none':'inline-block';
+  $('lockBtn').style.display=editingUnlocked?'inline-block':'none';
+  $('editPassword').disabled=editingUnlocked;
+  $('lockStatus').textContent=editingUnlocked?'🔓 Módosítás engedélyezve ezen az oldalon a bezárásig vagy lezárásig.':'🔒 A módosítások zárolva vannak. Megtekinteni lehet, szerkeszteni csak a jelszóval.';
+  $('lockStatus').className='status '+(editingUnlocked?'positive':'');
+}
 const $=id=>document.getElementById(id), money=n=>new Intl.NumberFormat('hu-HU',{style:'currency',currency:'HUF',maximumFractionDigits:0}).format(n||0), pct=n=>(n*100).toLocaleString('hu-HU',{maximumFractionDigits:1})+'%';
 const iso=d=>{const x=new Date(d+'T12:00:00');const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day+3);const first=new Date(x.getFullYear(),0,4);const w=1+Math.round(((x-first)/86400000-3+((first.getDay()+6)%7))/7);return `${x.getFullYear()}-CW${String(w).padStart(2,'0')}`};
 const profit=b=>b.result==='Nyert'?b.stake*(b.odds-1):b.result==='Veszített'?-b.stake:0;
 const closed=b=>['Nyert','Veszített'].includes(b.result);
-function save(){localStorage.setItem(KEY,JSON.stringify(bets));render()}
+function save(){if(!editingUnlocked){alert('Módosításhoz előbb add meg a jelszót.');return}localStorage.setItem(KEY,JSON.stringify(bets));render()}
 function render(){
  const settled=bets.filter(closed),staked=settled.reduce((s,b)=>s+b.stake,0),p=settled.reduce((s,b)=>s+profit(b),0),wins=settled.filter(b=>b.result==='Nyert').length;
  $('totalProfit').textContent=money(p);$('totalProfit').className='value '+(p>=0?'positive':'negative');$('winRate').textContent=pct(settled.length?wins/settled.length:0);$('settled').textContent=settled.length;$('stakes').textContent=money(staked);$('roi').textContent=pct(staked?p/staked:0);
@@ -64,17 +83,18 @@ function render(){
  const group=(keyfn)=>{const g={};bets.filter(closed).forEach(b=>{let k=keyfn(b);(g[k]??=[]).push(b)});return Object.entries(g).sort((a,b)=>b[0].localeCompare(a[0]))};
  $('weeks').innerHTML=group(b=>iso(b.date)).slice(0,20).map(([k,arr])=>summaryRow(k,arr)).join('')||'<tr><td colspan="4" class="muted">Nincs lezárt fogadás.</td></tr>';
  $('months').innerHTML=group(b=>b.date.slice(0,7)).slice(0,18).map(([k,arr])=>summaryRow(k,arr)).join('')||'<tr><td colspan="4" class="muted">Nincs lezárt fogadás.</td></tr>';
+ applyEditLock();
 }
 function summaryRow(k,a){const p=a.reduce((s,b)=>s+profit(b),0),w=a.filter(b=>b.result==='Nyert').length;return `<tr><td>${k}</td><td>${a.length}</td><td class="${p>=0?'positive':'negative'}">${money(p)}</td><td>${pct(w/a.length)}</td></tr>`}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 $('date').value=new Date().toISOString().slice(0,10);
-$('betForm').addEventListener('submit',e=>{e.preventDefault();const id=$('editId').value||crypto.randomUUID();const old=bets.find(b=>b.id===id);const b={id,date:$('date').value,stake:Number($('stake').value),odds:Number($('odds').value),result:$('result').value,event:$('event').value.trim(),tip:$('tip').value.trim(),createdAt:old?.createdAt||new Date().toISOString()};if(old)bets=bets.map(x=>x.id===id?b:x);else bets.push(b);save();e.target.reset();$('editId').value='';$('date').value=new Date().toISOString().slice(0,10);$('formTitle').textContent='＋ Új fogadás';$('saveBtn').textContent='Fogadás mentése';$('formStatus').textContent='Mentve ebben a böngészőben.'});
-window.editBet=id=>{const b=bets.find(x=>x.id===id);if(!b)return;$('editId').value=b.id;$('date').value=b.date;$('stake').value=b.stake;$('odds').value=b.odds;$('result').value=b.result;$('event').value=b.event||'';$('tip').value=b.tip||'';$('formTitle').textContent='Fogadás szerkesztése';$('saveBtn').textContent='Módosítás mentése';window.scrollTo({top:0,behavior:'smooth'})};
-window.deleteBet=id=>{if(confirm('Biztosan törlöd ezt a fogadást?')){bets=bets.filter(b=>b.id!==id);save()}};
+$('betForm').addEventListener('submit',e=>{e.preventDefault();if(!editingUnlocked){alert('Módosításhoz előbb add meg a jelszót.');return}const id=$('editId').value||crypto.randomUUID();const old=bets.find(b=>b.id===id);const b={id,date:$('date').value,stake:Number($('stake').value),odds:Number($('odds').value),result:$('result').value,event:$('event').value.trim(),tip:$('tip').value.trim(),createdAt:old?.createdAt||new Date().toISOString()};if(old)bets=bets.map(x=>x.id===id?b:x);else bets.push(b);save();e.target.reset();$('editId').value='';$('date').value=new Date().toISOString().slice(0,10);$('formTitle').textContent='＋ Új fogadás';$('saveBtn').textContent='Fogadás mentése';$('formStatus').textContent='Mentve ebben a böngészőben.'});
+window.editBet=id=>{if(!editingUnlocked){alert('Módosításhoz előbb add meg a jelszót.');return}const b=bets.find(x=>x.id===id);if(!b)return;$('editId').value=b.id;$('date').value=b.date;$('stake').value=b.stake;$('odds').value=b.odds;$('result').value=b.result;$('event').value=b.event||'';$('tip').value=b.tip||'';$('formTitle').textContent='Fogadás szerkesztése';$('saveBtn').textContent='Módosítás mentése';window.scrollTo({top:0,behavior:'smooth'})};
+window.deleteBet=id=>{if(!editingUnlocked){alert('Módosításhoz előbb add meg a jelszót.');return}if(confirm('Biztosan törlöd ezt a fogadást?')){bets=bets.filter(b=>b.id!==id);save()}};
 $('period').onchange=render;$('statusFilter').onchange=render;
 $('exportBtn').onclick=()=>{const data=[['id','date','stake','odds','result','event','tip'],...bets.map(b=>[b.id,b.date,b.stake,b.odds,b.result,b.event,b.tip])];const csv=data.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='tippmix-export.csv';a.click();URL.revokeObjectURL(a.href)};
-$('importBtn').onclick=()=>$('csvFile').click();
-$('csvFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;const text=await f.text();const lines=text.replace(/^\ufeff/,'').split(/\r?\n/).filter(Boolean);const parse=line=>{let out=[],v='',q=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'&&q&&line[i+1]==='"'){v+='"';i++}else if(c==='"')q=!q;else if((c===';'||c===',')&&!q){out.push(v);v=''}else v+=c}out.push(v);return out};const imported=lines.slice(1).map(line=>{const a=parse(line);return {id:a[0]||crypto.randomUUID(),date:a[1],stake:Number(a[2]),odds:Number(a[3]),result:a[4]||'Függőben',event:a[5]||'',tip:a[6]||''}}).filter(b=>b.date&&Number.isFinite(b.stake)&&Number.isFinite(b.odds));if(confirm(`${imported.length} fogadás importálása? A meglévő adatokhoz hozzáadódnak.`)){bets.push(...imported);save()}e.target.value=''};
+$('importBtn').onclick=()=>{if(!editingUnlocked){alert('CSV importhoz előbb add meg a jelszót.');return}$('csvFile').click()};
+$('csvFile').onchange=async e=>{if(!editingUnlocked){alert('CSV importhoz előbb add meg a jelszót.');e.target.value='';return}const f=e.target.files[0];if(!f)return;const text=await f.text();const lines=text.replace(/^\ufeff/,'').split(/\r?\n/).filter(Boolean);const parse=line=>{let out=[],v='',q=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'&&q&&line[i+1]==='"'){v+='"';i++}else if(c==='"')q=!q;else if((c===';'||c===',')&&!q){out.push(v);v=''}else v+=c}out.push(v);return out};const imported=lines.slice(1).map(line=>{const a=parse(line);return {id:a[0]||crypto.randomUUID(),date:a[1],stake:Number(a[2]),odds:Number(a[3]),result:a[4]||'Függőben',event:a[5]||'',tip:a[6]||''}}).filter(b=>b.date&&Number.isFinite(b.stake)&&Number.isFinite(b.odds));if(confirm(`${imported.length} fogadás importálása? A meglévő adatokhoz hozzáadódnak.`)){bets.push(...imported);save()}e.target.value=''};
 async function loadWorkbookSeed(){
   const notice=$('excelNotice');
   try{
@@ -116,6 +136,10 @@ async function loadWorkbookSeed(){
     render();
   }
 }
+$('unlockBtn').addEventListener('click',()=>{if($('editPassword').value===EDIT_PASSWORD){editingUnlocked=true;$('editPassword').value='';applyEditLock()}else{$('lockStatus').textContent='Hibás jelszó. A módosítások zárolva maradtak.';$('lockStatus').className='status negative';$('editPassword').select()}});
+$('editPassword').addEventListener('keydown',e=>{if(e.key==='Enter')$('unlockBtn').click()});
+$('lockBtn').addEventListener('click',()=>{editingUnlocked=false;applyEditLock();$('editId').value='';$('betForm').reset();$('date').value=new Date().toISOString().slice(0,10);$('formTitle').textContent='＋ Új fogadás';$('saveBtn').textContent='Fogadás mentése'});
+applyEditLock();
 loadWorkbookSeed();
 </script>
 </body></html>

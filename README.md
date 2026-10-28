@@ -14,3 +14,9 @@ Ez a változat a meglévő `Tippmix_kezelo_heti_es_havi_elemzessel(1).xlsx` munk
 - Az oldal jelenleg a szerkesztéseket a megnyitott böngésző helyi tárolójába menti. Másik eszközön ugyanaz az Excel-alapállapot töltődik be, de a későbbi módosítások nem szinkronizálódnak. Ehhez külön online adatbázis és bejelentkezés szükséges; GitHub Pages önmagában nem tud biztonságosan közös, szerkeszthető fájlt tárolni.
 - A munkafüzet fájlt közvetlenül nem írja át, így az eredeti Excel és a képletek/diagramok megmaradnak a repositoryban. Az appon végzett módosítások egyelőre nem kerülnek vissza az Excel-fájlba.
 - Az Excel beolvasásához a SheetJS könyvtárat CDN-ről tölti be, ezért első megnyitáskor internetkapcsolat szükséges.
+
+
+## Módosítási jelszó
+A webes felületen a módosítások alapértelmezetten zárolva vannak. A feloldó jelszó: `01234`. A feloldás csak az aktuális böngészőoldalon él; frissítéskor újra zárol.
+
+**Biztonsági megjegyzés:** ez egy kliensoldali felületzár, nem valódi adatbiztonsági védelem. Mivel a GitHub Pages nyilvános, a jelszó a weboldal forráskódjából kiolvasható, és ez nem védi a közös online adatbázist. Valódi jogosultságvédelemhez szerveroldali hitelesítés kell.
