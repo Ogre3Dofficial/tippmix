@@ -49,13 +49,14 @@ header{padding:26px max(18px,calc((100% - 1200px)/2));border-bottom:1px solid va
 <div class="scroll"><table><thead><tr><th>Dátum</th><th>Esemény / tipp</th><th>Tét</th><th>Odds</th><th>Eredmény</th><th>Profit</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></section>
 </div>
 <div class="layout">
-<section class="panel"><h2>Heti elemzés (ISO hét)</h2><div class="scroll"><table><thead><tr><th>Hét</th><th>Fogadások</th><th>Profit</th><th>Nyerési %</th></tr></thead><tbody id="weeks"></tbody></table></div></section>
-<section class="panel"><h2>Havi elemzés</h2><div class="scroll"><table><thead><tr><th>Hónap</th><th>Fogadások</th><th>Profit</th><th>Nyerési %</th></tr></thead><tbody id="months"></tbody></table></div></section>
+<section class="panel"><h2>Heti elemzés (ISO hét)</h2><div class="scroll"><table><thead><tr><th>Hét</th><th>Fogadások</th><th>Megtett tét</th><th>Profit</th><th>Nyerési %</th><th>ROI</th></tr></thead><tbody id="weeks"></tbody></table></div></section>
+<section class="panel"><h2>Havi elemzés</h2><div class="scroll"><table><thead><tr><th>Hónap</th><th>Fogadások</th><th>Megtett tét</th><th>Profit</th><th>Nyerési %</th><th>ROI</th></tr></thead><tbody id="months"></tbody></table></div></section>
 </div>
 <p class="status" id="storageStatus">Excel-forrás: GitHub Pages melletti tippmix.xlsx · módosítások: helyi böngésző</p>
 </main>
 <script>
-const KEY='ogre3d-tippmix-v2';
+const KEY='ogre3d-tippmix-v3';
+const OLD_KEY='ogre3d-tippmix-v2';
 let bets=[];
 let excelLoaded=false;
 let editingUnlocked=false;
@@ -81,11 +82,12 @@ function render(){
  $('count').textContent=`${list.length} tétel`;
  $('rows').innerHTML=list.map(b=>`<tr><td>${b.date}</td><td>${esc(b.event||'—')}<div class="muted">${esc(b.tip||'')}</div></td><td>${money(b.stake)}</td><td>${Number(b.odds).toFixed(2)}</td><td>${esc(b.result)}</td><td class="${profit(b)>=0?'positive':'negative'}">${closed(b)?money(profit(b)):'—'}</td><td><button class="secondary" onclick="editBet('${b.id}')">✎</button> <button class="danger" onclick="deleteBet('${b.id}')">×</button></td></tr>`).join('')||'<tr><td colspan="7" class="muted">Még nincs fogadás ebben a nézetben.</td></tr>';
  const group=(keyfn)=>{const g={};bets.filter(closed).forEach(b=>{let k=keyfn(b);(g[k]??=[]).push(b)});return Object.entries(g).sort((a,b)=>b[0].localeCompare(a[0]))};
- $('weeks').innerHTML=group(b=>iso(b.date)).slice(0,20).map(([k,arr])=>summaryRow(k,arr)).join('')||'<tr><td colspan="4" class="muted">Nincs lezárt fogadás.</td></tr>';
- $('months').innerHTML=group(b=>b.date.slice(0,7)).slice(0,18).map(([k,arr])=>summaryRow(k,arr)).join('')||'<tr><td colspan="4" class="muted">Nincs lezárt fogadás.</td></tr>';
+ $('weeks').innerHTML=groupAll(b=>iso(b.date)).slice(0,20).map(([k,arr])=>summaryRow(k,arr)).join('')||'<tr><td colspan="6" class="muted">Nincs fogadás.</td></tr>';
+ $('months').innerHTML=groupAll(b=>b.date.slice(0,7)).slice(0,18).map(([k,arr])=>summaryRow(k,arr)).join('')||'<tr><td colspan="6" class="muted">Nincs fogadás.</td></tr>';
  applyEditLock();
 }
-function summaryRow(k,a){const p=a.reduce((s,b)=>s+profit(b),0),w=a.filter(b=>b.result==='Nyert').length;return `<tr><td>${k}</td><td>${a.length}</td><td class="${p>=0?'positive':'negative'}">${money(p)}</td><td>${pct(w/a.length)}</td></tr>`}
+function groupAll(keyfn){const g={};bets.forEach(b=>{let k=keyfn(b);(g[k]??=[]).push(b)});return Object.entries(g).sort((a,b)=>b[0].localeCompare(a[0]))}
+function summaryRow(k,a){const settled=a.filter(closed),p=settled.reduce((s,b)=>s+profit(b),0),staked=a.reduce((s,b)=>s+(Number(b.stake)||0),0),settledStake=settled.reduce((s,b)=>s+(Number(b.stake)||0),0),w=settled.filter(b=>b.result==='Nyert').length;return `<tr><td>${k}</td><td>${a.length}</td><td>${money(staked)}</td><td class="${p>=0?'positive':'negative'}">${money(p)}</td><td>${pct(settled.length?w/settled.length:0)}</td><td>${pct(settledStake?p/settledStake:0)}</td></tr>`}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 $('date').value=new Date().toISOString().slice(0,10);
 $('betForm').addEventListener('submit',e=>{e.preventDefault();if(!editingUnlocked){alert('Módosításhoz előbb add meg a jelszót.');return}const id=$('editId').value||crypto.randomUUID();const old=bets.find(b=>b.id===id);const b={id,date:$('date').value,stake:Number($('stake').value),odds:Number($('odds').value),result:$('result').value,event:$('event').value.trim(),tip:$('tip').value.trim(),createdAt:old?.createdAt||new Date().toISOString()};if(old)bets=bets.map(x=>x.id===id?b:x);else bets.push(b);save();e.target.reset();$('editId').value='';$('date').value=new Date().toISOString().slice(0,10);$('formTitle').textContent='＋ Új fogadás';$('saveBtn').textContent='Fogadás mentése';$('formStatus').textContent='Mentve ebben a böngészőben.'});
@@ -102,13 +104,18 @@ async function loadWorkbookSeed(){
     const res=await fetch('./tippmix.xlsx',{cache:'no-store'});
     if(!res.ok) throw new Error('Nem találom a repositoryban a tippmix.xlsx fájlt. Töltsd fel az index.html mellé.');
     const buf=await res.arrayBuffer();
-    const wb=XLSX.read(buf,{type:'array',cellDates:true});
+    const wb=XLSX.read(buf,{type:'array',cellDates:false});
     const ws=wb.Sheets['Tippmix napló'];
     if(!ws) throw new Error('Az Excelben nem található a „Tippmix napló” munkalap.');
-    const saved=localStorage.getItem(KEY);
+    let saved=localStorage.getItem(KEY);
+    if(!saved){
+      const oldSaved=localStorage.getItem(OLD_KEY);
+      if(oldSaved){
+        try{const prior=JSON.parse(oldSaved);bets=prior.map(b=>{if(b.sourceRow && /^\d{4}-\d{2}-\d{2}$/.test(b.date)){const d=new Date(b.date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+1);return {...b,date:d.toISOString().slice(0,10)}}return b});localStorage.setItem(KEY,JSON.stringify(bets));saved=JSON.stringify(bets);notice.textContent='A korábban mentett Excel-dátumokat javítottuk (+1 nap).';}catch(e){saved=null}}
+    }
     if(saved){
       bets=JSON.parse(saved);
-      notice.textContent=`Excel betöltve (${bets.length} helyi fogadás). Az Excel a kezdőadatforrás; ezen az eszközön korábban mentett módosítások vannak használatban.`;
+      notice.textContent=`Betöltve (${bets.length} helyi fogadás). A korábbi Excel-sorok dátumkezelése javítva.`;
     } else {
       const imported=[];
       const lastRow=ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).e.r+1 : 133;
@@ -118,9 +125,9 @@ async function loadWorkbookSeed(){
         const stake=Number(stakeCell?.v), odds=Number(oddsCell?.v), result=String(resultCell?.v??'').trim();
         if(!dateVal || !Number.isFinite(stake) || !Number.isFinite(odds) || odds<=0) continue;
         let date;
-        if(dateVal instanceof Date) date=`${dateVal.getFullYear()}-${String(dateVal.getMonth()+1).padStart(2,'0')}-${String(dateVal.getDate()).padStart(2,'0')}`;
-        else if(typeof dateVal==='number') date=XLSX.SSF.format('yyyy-mm-dd',dateVal);
-        else date=String(dateVal).slice(0,10);
+        if(typeof dateVal==='number') { const parts=XLSX.SSF.parse_date_code(dateVal); if(!parts) continue; date=`${parts.y}-${String(parts.m).padStart(2,'0')}-${String(parts.d).padStart(2,'0')}`; }
+        else if(dateVal instanceof Date) date=`${dateVal.getUTCFullYear()}-${String(dateVal.getUTCMonth()+1).padStart(2,'0')}-${String(dateVal.getUTCDate()).padStart(2,'0')}`;
+        else { const raw=String(dateVal).trim(); const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})/); date=m?`${m[1]}-${m[2]}-${m[3]}`:raw.slice(0,10); }
         imported.push({id:'excel-'+r,date,stake,odds,result:['Nyert','Veszített','Függőben','Void'].includes(result)?result:'Függőben',event:'',tip:'',createdAt:new Date().toISOString(),sourceRow:r});
       }
       bets=imported;
