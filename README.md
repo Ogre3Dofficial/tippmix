@@ -48,3 +48,7 @@ A `Ogre3Dofficial/tippmix` repository `main` ágának gyökerébe töltsd fel / 
 - A jelszó minden mentési kérésben elküldésre kerül HTTPS-en a saját Vercel végpontodra; a szerver összehasonlítja a `SAVE_PASSWORD` környezeti változóval. Ne használj olyan jelszót, amit máshol is használsz.
 - A webes oldalon látható jelszómező nem helyettesít teljes felhasználói fiókrendszert. Ha a repository és az alkalmazás nyilvános, a mentési végpont URL-je is ismert lesz; a jelszó védi a mentési műveletet.
 - A dátumokat ISO `YYYY-MM-DD` formában kezeljük, hogy ne csússzanak el időzóna miatt.
+
+
+### Friss betöltés
+A `api/load.js` végpont minden oldalbetöltéskor közvetlenül a GitHub API-ból olvassa ki a `tippmix.xlsx` aktuális verzióját, `no-store` gyorsítótár-tiltással. A frontend már nem a `raw.githubusercontent.com` CDN-változatát használja betöltéshez. A módosítás életbe lépéséhez ezt a csomagot töltsd fel a GitHub repositoryba, majd várd meg a Vercel új deploymentjét.

@@ -107,47 +107,19 @@ $('csvFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;const tex
 async function loadWorkbookSeed(){
   const notice=$('excelNotice');
   try{
-    if(!window.XLSX) throw new Error('Az Excel-beolvasó könyvtár nem töltődött be. Ellenőrizd az internetkapcsolatot.');
-    const res=await fetch('https://raw.githubusercontent.com/Ogre3Dofficial/tippmix/main/tippmix.xlsx?cache='+Date.now(),{cache:'no-store'});
-    if(!res.ok) throw new Error('Nem találom a repositoryban a tippmix.xlsx fájlt. Töltsd fel az index.html mellé.');
-    const buf=await res.arrayBuffer();
-    const wb=XLSX.read(buf,{type:'array',cellDates:false});
-    const ws=wb.Sheets['Tippmix napló'];
-    if(!ws) throw new Error('Az Excelben nem található a „Tippmix napló” munkalap.');
-    const imported=[];
-    const lastRow=ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).e.r+1 : 133;
-    for(let r=7;r<=lastRow;r++){
-      const dateCell=ws['C'+r], stakeCell=ws['D'+r], oddsCell=ws['E'+r], resultCell=ws['G'+r];
-      const dateVal=dateCell?.v;
-      const stake=Number(stakeCell?.v), odds=Number(oddsCell?.v), result=String(resultCell?.v??'').trim();
-      if(!dateVal || !Number.isFinite(stake) || !Number.isFinite(odds) || odds<=0) continue;
-      let date;
-      if(typeof dateVal==='number') { const parts=XLSX.SSF.parse_date_code(dateVal); if(!parts) continue; date=`${parts.y}-${String(parts.m).padStart(2,'0')}-${String(parts.d).padStart(2,'0')}`; }
-      else if(dateVal instanceof Date) date=`${dateVal.getUTCFullYear()}-${String(dateVal.getUTCMonth()+1).padStart(2,'0')}-${String(dateVal.getUTCDate()).padStart(2,'0')}`;
-      else { const raw=String(dateVal).trim(); const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})/); date=m?`${m[1]}-${m[2]}-${m[3]}`:raw.slice(0,10); }
-      imported.push({id:'excel-'+r,date,stake,odds,result:['Nyert','Veszített','Függőben','Void'].includes(result)?result:'Függőben',event:String(ws['J'+r]?.v??''),tip:String(ws['K'+r]?.v??''),createdAt:new Date().toISOString(),sourceRow:r});
-    }
-    const savedText=localStorage.getItem(KEY);
-    const alreadySynced=localStorage.getItem('ogre3d-tippmix-github-synced')==='1';
-    if(savedText && !alreadySynced){
-      try{
-        const saved=JSON.parse(savedText), byRow=new Map(saved.filter(b=>b.sourceRow).map(b=>[Number(b.sourceRow),b]));
-        for(const b of imported){const prior=byRow.get(Number(b.sourceRow));if(prior){Object.assign(b,prior,{id:b.id,date:b.date,sourceRow:b.sourceRow});}}
-        const unsynced=saved.filter(b=>!b.sourceRow);
-        bets=[...imported,...unsynced];
-        notice.textContent=`Excelből betöltve ${imported.length} sor; a korábbi böngészőből ${unsynced.length} új, még Excelbe nem mentett fogadás megőrizve. A dátumokat az Excelből olvassuk.`;
-      }catch(e){bets=imported;notice.textContent=`Sikeresen betöltve az eredeti Excelből: ${bets.length} fogadási sor.`;}
-    } else {
-      bets=imported;
-      notice.textContent=`Sikeresen betöltve a GitHub Excelből: ${bets.length} fogadási sor. A meccsnév és tipp oszlopok a J–K oszlopból töltődnek.`;
-    }
+    const res=await fetch('/api/load?ts='+Date.now(), {method:'GET', cache:'no-store', headers:{'Cache-Control':'no-cache'}});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok || !Array.isArray(data.bets)) throw new Error(data.error || 'Nem sikerült a legfrissebb Excel-adatokat betölteni.');
+    bets=data.bets;
     localStorage.setItem(KEY,JSON.stringify(bets));
     excelLoaded=true;
-    $('storageStatus').textContent='Adatforrás: GitHub tippmix.xlsx · a mentéshez add meg a mentési jelszót';
+    notice.textContent=`Frissen betöltve a GitHubon tárolt Excelből: ${bets.length} fogadás. Utolsó lekérés: ${new Date().toLocaleTimeString('hu-HU')}.`;
+    $('storageStatus').textContent='Adatforrás: GitHub Excel a Vercel háttérszolgáltatásán keresztül · friss adat';
     render();
   }catch(err){
-    notice.textContent='Excel betöltési hiba: '+err.message+' A fájl neve legyen pontosan tippmix.xlsx, és az index.html mellett legyen a repository gyökerében.';
-    $('storageStatus').textContent='Excel-forrás nem érhető el';render();
+    notice.textContent='Excel betöltési hiba: '+err.message;
+    $('storageStatus').textContent='Az online Excel nem érhető el';
+    render();
   }
 }
 applyEditLock();
