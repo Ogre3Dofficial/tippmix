@@ -45,7 +45,7 @@ header{padding:26px max(18px,calc((100% - 1200px)/2));border-bottom:1px solid va
 <div class="actions"><button class="secondary" id="exportBtn" type="button">Exportálás CSV-be</button><button class="secondary" id="importBtn" type="button">CSV import</button><input id="csvFile" type="file" accept=".csv,text/csv" hidden></div>
 <div class="note" id="excelNotice">Excel-forrás betöltése folyamatban…</div>
 </section>
-<section class="panel"><h2>Fogadások</h2><div class="filters"><select id="period"><option value="all">Minden fogadás</option><option value="week">Aktuális hét</option><option value="month">Aktuális hónap</option></select><select id="statusFilter"><option value="all">Minden eredmény</option><option>Függőben</option><option>Nyert</option><option>Veszített</option><option>Void</option></select><span id="count" class="status"></span></div>
+<section class="panel"><h2>Fogadások</h2><div class="filters"><select id="period"><option value="all">Minden fogadás</option><option value="week" selected>Aktuális hét</option><option value="month">Aktuális hónap</option></select><select id="statusFilter"><option value="all">Minden eredmény</option><option>Függőben</option><option>Nyert</option><option>Veszített</option><option>Void</option></select><span id="count" class="status"></span></div>
 <div class="scroll"><table><thead><tr><th>Dátum</th><th>Esemény / tipp</th><th>Tét</th><th>Odds</th><th>Eredmény</th><th>Profit</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></section>
 </div>
 <div class="layout">
